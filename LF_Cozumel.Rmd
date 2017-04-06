@@ -1,0 +1,77 @@
+---
+title: "LF fishery in Mexican Caribbean"
+author: "Luis Malpica"
+date: "Apr, 2017"
+output:
+  pdf_document: default
+  html_document:
+    code_folding: hide
+---
+```{r setup, include=FALSE}
+#knitr::opts_chunk$set(echo = FALSE)
+#code_folding: hide
+```
+
+```{r Libraries & data, include=F, cache=FALSE, message=F}
+rm(list = ls())
+
+#load
+#library(plyr)
+#library(tidyr)
+library(reshape2)
+library(dplyr)
+library(ggplot2)
+library(zoo)
+
+#A custom theme for ggplot####
+theme_gg <- function(base_size = 11, base_family = "") {
+  theme_light() +
+    theme(
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      strip.background = element_rect(fill = NA, colour = NA),
+      strip.text.x = element_text(colour = "grey10"),
+      axis.text = element_text(colour = "grey20",size=8),
+      axis.title = element_text(colour = "grey20",size=10),
+      legend.title = element_text(colour = "grey20", size = rel(1.2)),
+      panel.border = element_rect(fill = NA, colour = "grey70", size = 1),
+      legend.key.size = unit(0.8, "lines"),
+      legend.text = element_text(size = rel(1), colour = "grey20"),
+      legend.key = element_rect(colour = NA)
+    )
+}
+```
+
+```{r Data manipulation, include=T}
+#Read and manipulate data####
+d_surveys <- read.table("data/LF_Cozumel.csv",sep=",", header=T)
+
+d16 <- read.table("data/PNSAVFish16.csv",sep=",", header=T)
+dLF <- read.table("data/LFPNSAV14_16.csv",sep=",", header=T)
+
+d_sur_melt <- reshape2::melt(d_surveys, id.vars = c("Fecha","Profundidad","Lat","Long","Ubicacion",
+                                                  "Sitio","Area","Transecto"),
+                    variable.name = "LF", value.name = "TL",na.rm = T)
+
+d_abund <- dplyr::tally(dplyr::group_by(d_sur_melt,Fecha,Profundidad,Lat,Long,Ubicacion,Sitio,
+                                        Area,Transecto))
+
+d_abs <- summarise(group_by(d_abund,Fecha,Lat,Long,Ubicacion,Sitio),
+                             Abund = sum(n))
+
+d_abs <- mutate(d_abs, dens = Abund/(0.012*14))
+
+d_abs$Fecha <- as.Date(d_abs$Fecha, "%d-%b-%y")
+
+
+```
+
+
+```{r LF plots, include=T,cache=FALSE, message=F}
+#LF in Cozumel
+ggplot(data=d_abs, aes(x=Fecha, y=dens)) +
+    geom_point() + geom_line() + facet_wrap(c("Sitio")) +
+  theme_gg()
+
+```
+
