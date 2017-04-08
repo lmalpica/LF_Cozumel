@@ -45,33 +45,39 @@ theme_gg <- function(base_size = 11, base_family = "") {
 ```{r Data manipulation, include=T}
 #Read and manipulate data####
 d_surveys <- read.table("data/LF_Cozumel.csv",sep=",", header=T)
+not <- cbind("Cocales Bajito", "Las Brisas")
+d_surveys <- dplyr::filter(d_surveys, ! Sitio %in% not)
 
-d16 <- read.table("data/PNSAVFish16.csv",sep=",", header=T)
-dLF <- read.table("data/LFPNSAV14_16.csv",sep=",", header=T)
+d_surveys <- d_surveys %>%  filter(!grepl("...Nov...",Fecha))
+
+d_surveys$TL[is.na(d_surveys$TL)] <- 0
 
 d_sur_melt <- reshape2::melt(d_surveys, id.vars = c("Fecha","Profundidad","Lat","Long","Ubicacion",
                                                   "Sitio","Area","Transecto"),
                     variable.name = "LF", value.name = "TL",na.rm = T)
 
-d_abund <- dplyr::tally(dplyr::group_by(d_sur_melt,Fecha,Profundidad,Lat,Long,Ubicacion,Sitio,
-                                        Area,Transecto))
+d_sur_melt$TL[d_sur_melt$TL>0] <- 1
 
-d_abs <- summarise(group_by(d_abund,Fecha,Lat,Long,Ubicacion,Sitio),
-                             Abund = sum(n))
+d_absLF <- summarise(group_by(d_sur_melt,Fecha,Lat,Long,Ubicacion,Sitio,Transecto),
+                             Abund = (sum(TL)))
 
-d_abs <- mutate(d_abs, dens = Abund/(0.012*14))
+d_densLF <- merge(summarise(group_by(d_absLF,Fecha,Lat,Long,Ubicacion,Sitio),
+                             AveLFm2 = (mean(Abund))/0.012),
+                  summarise(group_by(d_absLF,Fecha,Lat,Long,Ubicacion,Sitio),
+                             SDLFm2 = (sd(Abund))/0.012))
 
-d_abs$Fecha <- as.Date(d_abs$Fecha, "%d-%b-%y")
+d_densLF <- mutate(d_densLF, SELFm2 = SDLFm2/(sqrt(12)))
 
+d_densLF$Fecha <- as.Date(d_densLF$Fecha, "%d-%b-%y")
 
 ```
-
 
 ```{r LF plots, include=T,cache=FALSE, message=F}
 #LF in Cozumel
-ggplot(data=d_abs, aes(x=Fecha, y=dens)) +
-    geom_point() + geom_line() + facet_wrap(c("Sitio")) +
+ggplot(data=d_densLF, aes(x=Fecha, y=AveLFm2)) +
+    geom_line() + facet_wrap(c("Sitio")) +
+    geom_point() +
+    geom_pointrange((aes(ymin=AveLFm2-SELFm2, ymax=AveLFm2+SELFm2))) +
   theme_gg()
 
 ```
-
